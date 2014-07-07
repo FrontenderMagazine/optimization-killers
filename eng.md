@@ -11,19 +11,15 @@ overhead but the code will still be slow if not optimized.
 
 For example in generic compiler `a + b` will become something like this:
 
-```nasm
-mov eax, a
-mov ebx, b
-call RuntimeAdd
-```
+    mov eax, a
+    mov ebx, b
+    call RuntimeAdd
 
 In other words it just calls a runtime function. If `a` and `b` will always be integers, then something like this:
 
-```nasm
-mov eax, a
-mov ebx, b
-add eax, ebx
-```
+    mov eax, a
+    mov ebx, b
+    add eax, ebx
 
 would perform massively faster than the call figuring out complex javascript addition semantics at runtime.
 
@@ -48,48 +44,43 @@ You should be able to use node.js with some V8 flags to verify how patterns affe
 
 test.js:
 
-```js
-//Function that contains the pattern to be inspected (using with statement)
-function containsWith() {
-    return 3;
-    with({}) {}
-}
 
-function printStatus(fn) {
-    switch(%GetOptimizationStatus(fn)) {
-        case 1: console.log("Function is optimized"); break;
-        case 2: console.log("Function is not optimized"); break;
-        case 3: console.log("Function is always optimized"); break;
-        case 4: console.log("Function is never optimized"); break;
-        case 6: console.log("Function is maybe deoptimized"); break;
+    // Function that contains the pattern to be inspected (using with statement)
+    function containsWith() {
+        return 3;
+        with({}) {}
     }
-}
 
-//Fill type-info
-containsWith();
+    function printStatus(fn) {
+        switch(%GetOptimizationStatus(fn)) {
+            case 1: console.log("Function is optimized"); break;
+            case 2: console.log("Function is not optimized"); break;
+            case 3: console.log("Function is always optimized"); break;
+            case 4: console.log("Function is never optimized"); break;
+            case 6: console.log("Function is maybe deoptimized"); break;
+        }
+    }
 
-%OptimizeFunctionOnNextCall(containsWith);
-//The next call
-containsWith();
+    // Fill type-info
+    containsWith();
 
-//Check
-printStatus(containsWith);
-```
+    %OptimizeFunctionOnNextCall(containsWith);
+    // The next call
+    containsWith();
+
+    //Check
+    printStatus(containsWith);
 
 Running it:
 
-```
-$ node --trace_opt --trace_deopt --allow-natives-syntax test.js
-Function is not optimized
-```
+    $ node --trace_opt --trace_deopt --allow-natives-syntax test.js
+    Function is not optimized
 
 To see it's working, comment out the `with` statement and re-run:
 
-```bash
-$ node --trace_opt --trace_deopt --allow-natives-syntax test.js
-[optimizing 000003FFCBF74231 <JS Function containsWith (SharedFunctionInfo 00000000FE1389E1)> - took 0.345, 0.042, 0.010 ms]
-Function is optimized
-```
+    $ node --trace_opt --trace_deopt --allow-natives-syntax test.js
+    [optimizing 000003FFCBF74231 <JS Function containsWith (SharedFunctionInfo 00000000FE1389E1)> - took 0.345, 0.042, 0.010 ms]
+    Function is optimized
 
 It is important to use the tooling to verify that the workarounds are working and necessary.
 
@@ -101,11 +92,9 @@ It is **important to note** that even if the construct is unreachable or not run
 
 For example this does not help:
 
-```js
-if (DEVELOPMENT) {
-    debugger;
-}
-```
+    if (DEVELOPMENT) {
+        debugger;
+    }
 
 The above will punish the entire containing function even if the debugger statement is never reached.
 
@@ -127,31 +116,25 @@ Likely never optimizable:
 
 Just to be clear on the last point: the entire containing function is unavailable for optimization, when you do any of this:
 
-```js
-function containsObjectLiteralWithProto() {
-    return {__proto__: 3};
-}
-```
+    function containsObjectLiteralWithProto() {
+        return {__proto__: 3};
+    }
 
-```js
-function containsObjectLiteralWithGetter() {
-    return {
-        get prop() {
-            return 3;
-        }
-    };
-}
-```
+    function containsObjectLiteralWithGetter() {
+        return {
+            get prop() {
+                return 3;
+            }
+        };
+    }
 
-```js
-function containsObjectLiteralWithSetter() {
-    return {
-        set prop(val) {
-            this.val = val;
-        }
-    };
-}
-```
+    function containsObjectLiteralWithSetter() {
+        return {
+            set prop(val) {
+                this.val = val;
+            }
+        };
+    }
 
 Direct `eval` and `with` deserve a special mention here because they cause everything in their path to be dynamically scoped, thus possibly corrupting many other functions too as it became impossible to lexically tell to what variables are bound to.
 
@@ -159,136 +142,110 @@ Direct `eval` and `with` deserve a special mention here because they cause every
 
 Some of these statements cannot be avoided in production code such as `try-finally` and `try-catch`. To use such statements with minimal impact, they must be isolated to a minimal function so that the main code is not affected:
 
-```js
-var errorObject = {value: null};
-function tryCatch(fn, ctx, args) {
-    try {
-        return fn.apply(ctx, args);
+    var errorObject = {value: null};
+    function tryCatch(fn, ctx, args) {
+        try {
+            return fn.apply(ctx, args);
+        } catch(e) {
+            errorObject.value = e;
+            return errorObject;
+        }
     }
-    catch(e) {
-        errorObject.value = e;
-        return errorObject;
+
+    var result = tryCatch(mightThrow, void 0, [1,2,3]);
+    //Unambiguously tells whether the call threw
+    if (result === errorObject) {
+        var error = errorObject.value;
+    } else {
+        // result is the returned value
     }
-}
 
-var result = tryCatch(mightThrow, void 0, [1,2,3]);
-//Unambiguously tells whether the call threw
-if(result === errorObject) {
-    var error = errorObject.value;
-}
-else {
-    //result is the returned value
-}
-```
-
-
-
-##3\. Managing `arguments`
+## 3\. Managing `arguments`
 
 There are numerous ways to use `arguments` in a way that causes the function to be unoptimizable. One must be extremely careful when using `arguments`.
 
-####3\.1\. Reassigning a defined parameter while also mentioning `arguments` in the body. Typical example:
+#### 3\.1\. Reassigning a defined parameter while also mentioning `arguments` in the body. Typical example:
 
-```js
-function defaultArgsReassign(a, b) {
-     if (arguments.length < 2) b = 5;
-}
-```
+    function defaultArgsReassign(a, b) {
+        if (arguments.length < 2) b = 5;
+    }
 
 **Workaround** is to save the parameter to a new variable:
 
-```js
-function reAssignParam(a, b_) {
-    var b = b_;
-    //unlike b_, b can safely be reassigned
-    if (arguments.length < 2) b = 5;
-}
-```
+    function reAssignParam(a, b_) {
+        var b = b_;
+        // unlike b_, b can safely be reassigned
+        if (arguments.length < 2) b = 5;
+    }
 
 If this was the only use case for `arguments` in the function, it can often be replaced with a `undefined` check:
 
-```js
-function reAssignParam(a, b) {
-    if (b === void 0) b = 5;
-}
-```
+    function reAssignParam(a, b) {
+        if (b === void 0) b = 5;
+    }
 
 If it's likely that the function will later introduce `arguments` then maintenance could easily forget to leave the re-assignent there though.
 
-####3\.2\. Leaking arguments:
+#### 3\.2\. Leaking arguments:
 
-```js
-function leaksArguments1() {
-    return arguments;
-}
-```
+    function leaksArguments1() {
+        return arguments;
+    }
 
-```js
-function leaksArguments2() {
-    var args = [].slice.call(arguments);
-}
-```
+    function leaksArguments2() {
+        var args = [].slice.call(arguments);
+    }
 
-```js
-function leaksArguments3() {
-    var a = arguments;
-    return function() {
-        return a;
-    };
-}
-```
+    function leaksArguments3() {
+        var a = arguments;
+        return function() {
+            return a;
+        };
+    }
 
 The `arguments` object must not be passed or leaked anywhere.
 
 **Workaround** for proxying is to create array in-line:
 
-```js
-function doesntLeakArguments() {
-                    //.length is just an integer, this doesn't leak
-                    //the arguments object itself
-    var args = new Array(arguments.length);
-    for(var i = 0; i < args.length; ++i) {
-                //i is always valid index in the arguments object
-        args[i] = arguments[i];
+    function doesntLeakArguments() {
+                        // .length is just an integer, this doesn't leak
+                        // the arguments object itself
+        var args = new Array(arguments.length);
+        for(var i = 0; i < args.length; ++i) {
+                    //i is always valid index in the arguments object
+            args[i] = arguments[i];
+        }
+        return args;
     }
-    return args;
-}
-```
 
 It takes a lot of code and is annoying so it might be worth to analyze if it's really worth it. Then again optimizing always takes a lot of code when more code means more explicitly nailed down semantics.
 
 However, if you have a build-step, this can also be achieved with a macro that doesn't necessitate the use of source maps and lets the source code stay valid javascript:
 
-```js
-function doesntLeakArguments() {
-    INLINE_SLICE(args, arguments);
-    return args;
-}
-```
+    function doesntLeakArguments() {
+        INLINE_SLICE(args, arguments);
+        return args;
+    }
 
 The above technique is used in bluebird and the result is expanded into this in the build step:
 
-```js
-function doesntLeakArguments() {
-    var $_len = arguments.length;var args = new Array($_len); for(var $_i = 0; $_i < $_len; ++$_i) {args[$_i] = arguments[$_i];}
-    return args;
-}
-```
+    function doesntLeakArguments() {
+        var $_len = arguments.length;var args = new Array($_len); for(var $_i = 0; $_i < $_len; ++$_i) {args[$_i] = arguments[$_i];}
+        return args;
+    }
 
-####3\.3\. Assignment to arguments:
+#### 3\.3\. Assignment to arguments:
 
 This is actually possible in sloppy mode:
 
-```js
-function assignToArguments() {
-    arguments = 3;
-    return arguments;
-}
-```
+    function assignToArguments() {
+        arguments = 3;
+        return arguments;
+    }
 
 **Workaround**: there is no need to write such idiotic code. In strict mode, it throws an exception anyway.
 
-####What is safe `arguments` usage?
+#### What is safe `arguments` usage?
 
 Only use
 
@@ -298,71 +255,63 @@ Only use
 
 And note that the FUD about mentioning `arguments` causing an allocation of the arguments object is untrue when you use the it in the mentioned safe ways.
 
-##4\. Switch-case
+## 4\. Switch-case
 
 A switch-case statement can currently have up to 128 case-clauses, more than that and the function containing the switch statement is not optimizable
 
-```js
-function over128Cases(c) {
-    switch(c) {
-        case 1: break;
-        case 2: break;
-        case 3: break;
-        ...
-        case 128: break;
-        case 129: break;
+    function over128Cases(c) {
+        switch(c) {
+            case 1: break;
+            case 2: break;
+            case 3: break;
+            …
+            case 128: break;
+            case 129: break;
+        }
     }
-}
-```
+
 So keep case clause count of switch cases at or below 128 by using array of functions or if-else.
 
-##5\. For-in
+## 5\. For-in
 
 For-in statements can prevent the entire function from being optimized in a few cases.
 
 All of these give the reason "ForIn is not fast case" or similar.
 
-####5\.1\. The key is not a local variable:
+#### 5\.1\. The key is not a local variable:
 
-```js
-function nonLocalKey1() {
-    var obj = {}
-    for(var key in obj);
-    return function() {
-        return key;
-    };
-}
-```
+    function nonLocalKey1() {
+        var obj = {}
+        for(var key in obj);
+        return function() {
+            return key;
+        };
+    }
 
-```js
-var key;
-function nonLocalKey2() {
-    var obj = {}
-    for(key in obj);
-}
-```
+    var key;
+    function nonLocalKey2() {
+        var obj = {}
+        for(key in obj);
+    }
 
 So the key cannot be from upper scope and neither can it be referenced from lower scope. It must be a pure local variable.
 
-####5\.2\. The object being iterated is not a "simple enumerable"
+#### 5\.2\. The object being iterated is not a "simple enumerable"
 
-#####5\.2\.1\. Objects that are in "hash table mode" (aka "normalized objects", "dictionary mode" - objects who have a hash table as a backing data structure) are not simple enumerables**
+##### 5\.2\.1\. Objects that are in "hash table mode" (aka "normalized objects", "dictionary mode" - objects who have a hash table as a backing data structure) are not simple enumerables**
 
-```js
-function hashTableIteration() {
-    var hashTable = {"-": 3};
-    for(var key in hashTable);
-}
-```
+    function hashTableIteration() {
+        var hashTable = {"-": 3};
+        for(var key in hashTable);
+    }
+
 An object will go into hash table mode for example when you add too many properties dynamically (outside constructor), `delete` properties, use properties that cannot be valid identifiers and so on. In other words, when you use an object as if it was a hash table, it will be turned into a hash table. Passing such an object to `for-in` is a no no. You can tell if an object is in hash table mode by calling `console.log(%HasFastProperties(obj))` when the flag `--allow-natives-syntax` is enabled in Node.JS.
 
 <hr>
 
-#####5\.2\.2\. The object has enumerable properties in its prototype chain**
+##### 5\.2\.2\. The object has enumerable properties in its prototype chain**
 
-```js
-Object.prototype.fn = function() {};
-```
+    Object.prototype.fn = function() {};
 
 Doing the above puts an enumerable property into the prototype chain of all objects (except `Object.create(null)` objects). Any function that contains a `for-in` statement is therefore not optimizable (unless if they only iterate over `Object.create(null)` objects).
 
@@ -370,7 +319,7 @@ You can create non-enumerable properties with `Object.defineProperty` (not recom
 
 <hr>
 
-#####5\.2\.3\. The object contains enumerable array indices**
+##### 5\.2\.3\. The object contains enumerable array indices**
 
 Whether a property is an array index is defined in [the ecmascript specification](http://www.ecma-international.org/ecma-262/5.1/#sec-15.4):
 
@@ -378,14 +327,12 @@ Whether a property is an array index is defined in [the ecmascript specification
 
 Typically these will be arrays but normal objects can have array indices as well: `normalObj[0] = value;`
 
-```js
-function iteratesOverArray() {
-    var arr = [1, 2, 3];
-    for (var index in arr) {
-
+    function iteratesOverArray() {
+        var arr = [1, 2, 3];
+        for (var index in arr) {
+            …
+        }
     }
-}
-```
 
 So not only is iterating over array using `for-in` slower than a for loop, the entire function containing such a for-in statement will not be optimized.
 
@@ -395,12 +342,10 @@ If you pass a object to `for-in` that is not a simple enumerable it will punish 
 
 **Workaround**: Always use `Object.keys` and iterate over the array with for loop. If you truly need all properties from entire prototype chain, make an isolated helper function:
 
-```js
-function inheritedKeys(obj) {
-    var ret = [];
-    for(var key in obj) {
-        ret.push(key);
+    function inheritedKeys(obj) {
+        var ret = [];
+        for(var key in obj) {
+            ret.push(key);
+        }
+        return ret;
     }
-    return ret;
-}
-```
