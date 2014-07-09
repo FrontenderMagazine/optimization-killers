@@ -84,7 +84,7 @@ To see it's working, comment out the `with` statement and re-run:
 
 It is important to use the tooling to verify that the workarounds are working and necessary.
 
-##2. Unsupported syntax
+## 2. Unsupported syntax
 
 Some constructs are flat out not supported in the optimizing compiler and using such syntax will make the containing function unoptimizable.
 
