@@ -38,7 +38,7 @@ This guide will cover most patterns that cause the containing function go to "de
 4. [Switch-case](#4-switch-case)
 5. [For-in](#5-for-in)
 
-## 1\. Tooling
+## 1. Tooling
 
 You should be able to use node.js with some V8 flags to verify how patterns affect optimization. Generally you will make a function that contains the pattern, call it with all possible types to feed in the types and then call internal V8 functions to optimize and inspect it:
 
@@ -84,7 +84,7 @@ To see it's working, comment out the `with` statement and re-run:
 
 It is important to use the tooling to verify that the workarounds are working and necessary.
 
-##2\. Unsupported syntax
+##2. Unsupported syntax
 
 Some constructs are flat out not supported in the optimizing compiler and using such syntax will make the containing function unoptimizable.
 
@@ -160,11 +160,11 @@ Some of these statements cannot be avoided in production code such as `try-final
         // result is the returned value
     }
 
-## 3\. Managing `arguments`
+## 3. Managing `arguments`
 
 There are numerous ways to use `arguments` in a way that causes the function to be unoptimizable. One must be extremely careful when using `arguments`.
 
-#### 3\.1\. Reassigning a defined parameter while also mentioning `arguments` in the body. Typical example:
+#### 3.1. Reassigning a defined parameter while also mentioning `arguments` in the body. Typical example:
 
     function defaultArgsReassign(a, b) {
         if (arguments.length < 2) b = 5;
@@ -186,7 +186,7 @@ If this was the only use case for `arguments` in the function, it can often be r
 
 If it's likely that the function will later introduce `arguments` then maintenance could easily forget to leave the re-assignent there though.
 
-#### 3\.2\. Leaking arguments:
+#### 3.2. Leaking arguments:
 
     function leaksArguments1() {
         return arguments;
@@ -234,7 +234,7 @@ The above technique is used in bluebird and the result is expanded into this in 
         return args;
     }
 
-#### 3\.3\. Assignment to arguments:
+#### 3.3. Assignment to arguments:
 
 This is actually possible in sloppy mode:
 
@@ -255,7 +255,7 @@ Only use
 
 And note that the FUD about mentioning `arguments` causing an allocation of the arguments object is untrue when you use the it in the mentioned safe ways.
 
-## 4\. Switch-case
+## 4. Switch-case
 
 A switch-case statement can currently have up to 128 case-clauses, more than that and the function containing the switch statement is not optimizable
 
@@ -272,13 +272,13 @@ A switch-case statement can currently have up to 128 case-clauses, more than tha
 
 So keep case clause count of switch cases at or below 128 by using array of functions or if-else.
 
-## 5\. For-in
+## 5. For-in
 
 For-in statements can prevent the entire function from being optimized in a few cases.
 
 All of these give the reason "ForIn is not fast case" or similar.
 
-#### 5\.1\. The key is not a local variable:
+#### 5.1. The key is not a local variable:
 
     function nonLocalKey1() {
         var obj = {}
@@ -296,9 +296,9 @@ All of these give the reason "ForIn is not fast case" or similar.
 
 So the key cannot be from upper scope and neither can it be referenced from lower scope. It must be a pure local variable.
 
-#### 5\.2\. The object being iterated is not a "simple enumerable"
+#### 5.2. The object being iterated is not a "simple enumerable"
 
-##### 5\.2\.1\. Objects that are in "hash table mode" (aka "normalized objects", "dictionary mode" - objects who have a hash table as a backing data structure) are not simple enumerables**
+##### 5.2.1. Objects that are in "hash table mode" (aka "normalized objects", "dictionary mode" - objects who have a hash table as a backing data structure) are not simple enumerables**
 
     function hashTableIteration() {
         var hashTable = {"-": 3};
@@ -309,7 +309,7 @@ An object will go into hash table mode for example when you add too many propert
 
 <hr>
 
-##### 5\.2\.2\. The object has enumerable properties in its prototype chain**
+##### 5.2.2. The object has enumerable properties in its prototype chain**
 
     Object.prototype.fn = function() {};
 
@@ -319,7 +319,7 @@ You can create non-enumerable properties with `Object.defineProperty` (not recom
 
 <hr>
 
-##### 5\.2\.3\. The object contains enumerable array indices**
+##### 5.2.3. The object contains enumerable array indices**
 
 Whether a property is an array index is defined in [the ecmascript specification](http://www.ecma-international.org/ecma-262/5.1/#sec-15.4):
 
