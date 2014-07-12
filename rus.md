@@ -198,3 +198,64 @@ _test.js:_
         // результат и есть возвращённое значение
     }
 
+## 3. Обработка `arguments`
+
+Существует несколько способов использовать `arguments` так, чтобы недопустить
+оптимизацию функции. Каждый должен предельно осторожен с `arguments`.
+
+#### 3.1. Переопределение передаваемого параметра вместе с упоминанием `arguments` в теле функции.
+
+    function defaultArgsReassign(a, b) {
+        if (arguments.length < 2) b = 5;
+    }
+
+**Обходное решение:** сохранить параметр в новую переменную:
+
+    function reAssignParam(a, b_) {
+        var b = b_;
+        // b в отличие от b_, может быть безопасно переприсвоено
+        if (arguments.length < 2) b = 5;
+    }
+
+Если это единственнная причина использования `arguments`, то часто можно заменить на
+проверку на `undefined`:
+
+    function reAssignParam(a, b) {
+        if (b === void 0) b = 5;
+    }
+
+Тем не менее если есть вероятность, что функция позже будет использовать `arguments`,
+то при поддержке достаточно просто забыть убрать переприсваивание в этом месте,
+поэтому учитывайте эти два фактора при разработке.
+
+#### 3.2. Утечка arguments:
+
+    function leaksArguments1() {
+        return arguments;
+    }
+    
+    function leaksArguments2() {
+        var args = [].slice.call(arguments);
+    }
+    
+    function leaksArguments3() {
+        var a = arguments;
+        return function() {
+            return a;
+        };
+    }
+
+Объект `arguments` не должен никуда передаваться или «утекать» как либо ещё.
+
+**Обходное решение:** для безопасной передачи `arguments` создайте новый массив:
+
+    function doesntLeakArguments() {
+        // .length просто ещё одно число, поэтому
+        // весь объект `arguments` не утекает
+        var args = new Array(arguments.length);
+        for(var i = 0; i < args.length; ++i) {
+            // i всегда валидный индекс для объекта `arguments`
+            args[i] = arguments[i];
+        }
+        return args;
+    }
