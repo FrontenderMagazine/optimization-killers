@@ -395,7 +395,8 @@ _test.js:_
 > не равно 232−1. Если имя свойства представляет собой индекс массива, такое свойство
 > также называется *элементом* (element).
 
-Typically these will be arrays but normal objects can have array indices as well: `normalObj[0] = value;`
+Обычно так обращаются к элементам массива, но таким же образом можно обращаться к
+свойствам и атрибутам объектов: `normalObj[0] = value;`
 
     function iteratesOverArray() {
         var arr = [1, 2, 3];
