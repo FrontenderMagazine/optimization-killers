@@ -78,7 +78,7 @@ _test.js:_
             case 1: console.log("Функция оптимизирована"); break;
             case 2: console.log("Функция не оптимизирована"); break;
             case 3: console.log("Функция всегда оптимизируема"); break;
-            case 3: console.log("Функция никогда не оптимизируема"); break;
+            case 4: console.log("Функция никогда не оптимизируема"); break;
             case 6: console.log("Функция возможно деоптимизирована"); break;
         }
     }
